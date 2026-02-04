@@ -1,0 +1,80 @@
+export async function handler(event) {
+  // Handle preflight OPTIONS request
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Content-Type": "application/json"
+      },
+      body: ""
+    };
+  }
+
+  try {
+    const { address, beds, baths, arv, repair, condition } = JSON.parse(event.body);
+
+    if (!address || !beds || !baths || !arv || !repair || !condition) {
+      return {
+        statusCode: 400,
+        headers: {
+          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Headers": "Content-Type",
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ error: "Missing inputs" })
+      };
+    }
+
+    // Call Groq
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "llama3-70b-8192",
+        messages: [
+          {
+            role: "system",
+            content: "Respond ONLY with valid JSON containing arv, repair_cost, mao. Formula: mao = arv * 0.7 - repair_cost."
+          },
+          {
+            role: "user",
+            content: `Address: ${address}, Beds: ${beds}, Baths: ${baths}, ARV: ${arv}, Repair: ${repair}, Condition: ${condition}`
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    const parsed = JSON.parse(data.choices[0].message.content);
+
+    return {
+      statusCode: 200,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(parsed)
+    };
+
+  } catch (err) {
+    return {
+      statusCode: 500,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ error: err.message })
+    };
+  }
+}
